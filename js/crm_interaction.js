@@ -56,9 +56,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function actualizarNombrePais(cardId, pais) {
+        const card = document.getElementById(cardId);
+        const locationEl = card.querySelector('.actor-location');
+        if (locationEl) locationEl.textContent = pais;
+    }
+
     function onPaisChange(e) {
         const cardId = e.target.closest('.actor-card').id;
         crearRegionSelect(cardId, e.target.value);
+        actualizarNombrePais(cardId, e.target.value);
         actualizarTriangulacion();
     }
 
@@ -67,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     crearRegionSelect('card-partner', selPartner.value);
     crearRegionSelect('card-cliente', selCliente.value);
+    actualizarNombrePais('card-partner', selPartner.value);
+    actualizarNombrePais('card-cliente', selCliente.value);
 
     function actualizarTriangulacion() {
         const fecha = document.getElementById('fecha-base').value;
@@ -116,9 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.results.forEach(res => {
                 document.getElementById(`time-${res.id}`).textContent = res.formattedTime;
                 
+                // dayShift viene como string desde utcConversionBridge ("+1 día", "-1 día", "")
                 let dayStr = "Mismo Día";
-                if (res.dayShift > 0) dayStr = "+1 Día";
-                if (res.dayShift < 0) dayStr = "-1 Día";
+                if (res.dayShift && res.dayShift.includes('+1')) dayStr = "+1 Día";
+                if (res.dayShift && res.dayShift.includes('-1')) dayStr = "-1 Día";
                 
                 document.getElementById(`date-${res.id}`).textContent = dayStr;
 

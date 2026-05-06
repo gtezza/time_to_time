@@ -11,7 +11,7 @@ ADD COLUMN IF NOT EXISTS requiere_region BOOLEAN DEFAULT FALSE;
 -- IMPORTANTE: Cambiar "paises(id)" si tu tabla paises no usa "id" como llave primaria, por ejemplo: paises(pais_id)
 CREATE TABLE IF NOT EXISTS paises_regiones (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_pais UUID REFERENCES paises(id_pais) ON DELETE CASCADE, -- <--- MODIFICAR AQUI SI ES NECESARIO
+    id_pais INTEGER REFERENCES paises(id_pais) ON DELETE CASCADE, -- <--- MODIFICAR AQUI SI ES NECESARIO
     nombre_region VARCHAR(100) NOT NULL,
     iana_timezone VARCHAR(100) NOT NULL
 );
@@ -34,7 +34,7 @@ UPDATE paises SET requiere_region = TRUE, iana_timezone = NULL WHERE nombre ILIK
 -- Regiones de EE. UU. (Asegúrate de obtener el ID correcto de EE.UU. antes de insertar)
 DO $$ 
 DECLARE 
-  eeuu_id UUID;
+  eeuu_id INTEGER;
 BEGIN
   -- IMPORTANTE: Cambiar "id" por el nombre de tu llave primaria en la tabla paises
   SELECT id_pais INTO eeuu_id FROM paises WHERE nombre ILIKE '%EE%UU%' OR nombre ILIKE '%Estados Unidos%' LIMIT 1;

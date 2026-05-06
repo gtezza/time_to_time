@@ -1,4 +1,4 @@
-import { geoDatabase } from '../data/mockDB.js';
+import { geoDatabase } from '../../data/mockDB.js';
 
 export const getGeoMetadata = (countryName, regionName = null) => {
   const data = geoDatabase[countryName];
