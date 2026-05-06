@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Triangulador de Reuniones - Interacción CRM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/crm_interaction.css">
+</head>
+<body>
+
+<div class="crm-container">
+    <div class="header">
+        <h1>Coordinador de Reuniones Global</h1>
+        <p>Proyecta horarios simultáneos para agendamiento 3-way</p>
+    </div>
+
+    <!-- Panel de Control Principal -->
+    <div class="controls-section">
+        <div class="control-group">
+            <label for="fecha-base">Fecha de la Reunión (Local)</label>
+            <input type="date" id="fecha-base" class="glass-input">
+        </div>
+
+        <div class="control-group">
+            <label>Hora Propuesta (Partner)</label>
+            <div class="time-pickers">
+                <!-- Horas de 1 en 1 -->
+                <select id="hora-base" class="glass-input">
+                    <!-- Opciones generadas por JS -->
+                </select>
+                <span style="font-size: 1.5rem; font-weight: bold; align-self: center;">:</span>
+                <!-- Minutos de 15 en 15 -->
+                <select id="minuto-base" class="glass-input">
+                    <option value="00">00</option>
+                    <option value="15">15</option>
+                    <option value="30">30</option>
+                    <option value="45">45</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grilla de Actores 3-way -->
+    <div class="grid-3-col">
+        
+        <!-- Partner -->
+        <div class="actor-card" id="card-partner">
+            <div class="actor-role">Solicitante (Partner)</div>
+            <div class="actor-location">España</div>
+            <div class="actor-time" id="time-partner">--:--</div>
+            <div class="actor-date" id="date-partner">---</div>
+            <div style="margin-top: 15px;">
+                <select id="sel-partner" class="glass-input" style="width: 100%;">
+                    <!-- Llenado por mockDB -->
+                </select>
+            </div>
+        </div>
+
+        <!-- Central -->
+        <div class="actor-card" id="card-central">
+            <div class="actor-role">Casa Central</div>
+            <div class="actor-location">Argentina</div>
+            <div class="actor-time" id="time-central">--:--</div>
+            <div class="actor-date" id="date-central">---</div>
+            <div style="margin-top: 15px;">
+                <select id="sel-central" class="glass-input" style="width: 100%;" disabled>
+                    <option value="America/Argentina/Buenos_Aires" selected>Argentina (Bs As)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Cliente / Asistente -->
+        <div class="actor-card" id="card-cliente">
+            <div class="actor-role">Cliente / Asistente</div>
+            <div class="actor-location">El Salvador</div>
+            <div class="actor-time" id="time-cliente">--:--</div>
+            <div class="actor-date" id="date-cliente">---</div>
+            <div style="margin-top: 15px;">
+                <select id="sel-cliente" class="glass-input" style="width: 100%;">
+                    <!-- Llenado por mockDB -->
+                </select>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Soft Warning para Argentina -->
+    <div id="warning-box" class="warning-box">
+        <strong>⚠️ Advertencia de Horario Comercial:</strong> 
+        El horario proyectado para Argentina (<span id="warn-arg-time"></span>) está fuera del horario laboral (09:00 - 20:00).
+    </div>
+
+    <!-- Botones de Acción -->
+    <button id="btn-agendar" class="action-btn">Continuar al Agendamiento</button>
+
+</div>
+
+<!-- Scripts (Los modulos en type="module" nos permiten importar los agentes) -->
+<script type="module" src="js/crm_interaction.js"></script>
+
+</body>
+</html>
