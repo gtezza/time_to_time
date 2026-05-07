@@ -6,6 +6,10 @@ export const geoDatabase = {
   "Chile": { iana: "America/Santiago", requiresRegion: false },
   "México": { iana: "America/Mexico_City", requiresRegion: false },
   "Reino Unido": { iana: "Europe/London", requiresRegion: false },
+  "Bolivia": { iana: "America/La_Paz", requiresRegion: false },
+  "Venezuela": { iana: "America/Caracas", requiresRegion: false },
+  "Perú": { iana: null, requiresRegion: false },
+  "Uruguay": { iana: null, requiresRegion: false },
   "EE. UU.": { 
     requiresRegion: true,
     regions: {

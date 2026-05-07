@@ -1,7 +1,7 @@
-import { geoDatabase } from '../data/mockDB.js';
+import { PaisesService } from './services/paisesService.js';
 import { TimeOrchestrator } from './agents/TimeOrchestrator.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Referencias
     const form = document.getElementById('triangulatorForm');
     const resultArea = document.getElementById('resultArea');
@@ -24,9 +24,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hora por defecto: 09:00
     meetingHour.value = "09";
 
+    // Cargar la base de datos geográfica de países desde Supabase de forma asíncrona
+    let activeGeoDatabase = {};
+    try {
+        activeGeoDatabase = await PaisesService.getGeoDatabase();
+    } catch (e) {
+        console.error("Error al obtener la base de datos de países de Supabase:", e);
+    }
+
     // Poblar Países en los 3 selects
     const countrySelects = document.querySelectorAll('.country-select');
-    const countries = Object.keys(geoDatabase).sort();
+    const countries = Object.keys(activeGeoDatabase).sort();
 
     countrySelects.forEach(select => {
         countries.forEach(country => {
@@ -55,17 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const country = countrySelect.value;
         if (!country) return;
 
-        const data = geoDatabase[country];
+        const data = activeGeoDatabase[country];
+        if (!data) return;
+
         if (data.requiresRegion) {
             regionGroup.classList.remove('hidden');
             regionSelect.required = true;
             regionSelect.innerHTML = '<option value="" disabled selected>Seleccione región...</option>';
-            Object.keys(data.regions).forEach(region => {
-                const opt = document.createElement('option');
-                opt.value = region;
-                opt.textContent = region;
-                regionSelect.appendChild(opt);
-            });
+            if (data.regions) {
+                Object.keys(data.regions).forEach(region => {
+                    const opt = document.createElement('option');
+                    opt.value = region;
+                    opt.textContent = region;
+                    regionSelect.appendChild(opt);
+                });
+            }
         } else {
             regionGroup.classList.add('hidden');
             regionSelect.required = false;
@@ -97,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         ];
 
-        const result = TimeOrchestrator.triangulate(dateString, timeString, actors);
+        const result = TimeOrchestrator.triangulate(dateString, timeString, actors, activeGeoDatabase);
         renderResult(result);
     });
 
@@ -107,33 +119,66 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (result.status === "SUCCESS") {
             const isWarning = result.hasWarnings;
-            resultArea.className = `triangulation-result status-indicator ${isWarning ? 'warning' : 'success'}`;
+            const hasInvalid = result.hasInvalidZones;
             
-            let html = `<h3 style="margin-top:0; color: var(--${isWarning ? 'warning' : 'secondary'}-color);">
-                ${isWarning ? '⚠️ Horario con Advertencias' : '✅ Horario Óptimo'}
+            if (hasInvalid) {
+                resultArea.className = "triangulation-result status-indicator error";
+            } else {
+                resultArea.className = `triangulation-result status-indicator ${isWarning ? 'warning' : 'success'}`;
+            }
+            
+            let titleText = '✅ Horario Óptimo';
+            let titleColor = 'var(--secondary-color)';
+            if (hasInvalid) {
+                titleText = '❌ Zona Horaria No Configurada';
+                titleColor = 'var(--error-color)';
+            } else if (isWarning) {
+                titleText = '⚠️ Horario con Advertencias';
+                titleColor = 'var(--warning-color)';
+            }
+
+            let html = `<h3 style="margin-top:0; color: ${titleColor};">
+                ${titleText}
             </h3>
             <div style="margin-bottom: 15px; color: var(--text-secondary); font-size: 0.9rem;">Proyección para el ${meetingDate.value}</div>`;
 
             result.results.forEach(actor => {
                 const location = actor.region ? `${actor.region} (${actor.country})` : actor.country;
-                const warningMsg = actor.warning ? `<div class="time-warning" style="font-size:0.85rem; margin-top:5px;">${actor.warning}</div>` : '';
-                const timeColor = actor.warning ? 'time-warning' : 'time-success';
+                let warningMsg = '';
+                if (actor.warning) {
+                    warningMsg = `<div class="time-warning" style="font-size:0.85rem; margin-top:5px;">${actor.warning}</div>`;
+                } else if (actor.noTimezone) {
+                    warningMsg = `<div class="time-warning" style="font-size:0.85rem; margin-top:5px; color: #ef4444;">Falta vincular zona IANA en la base de datos</div>`;
+                }
+
+                let timeColor = 'time-success';
+                if (actor.warning) {
+                    timeColor = 'time-warning';
+                } else if (actor.noTimezone) {
+                    timeColor = 'time-error';
+                }
 
                 html += `
-                    <div class="result-row">
+                    <div class="result-row" style="${actor.noTimezone ? 'border-left: 3px solid #ef4444; padding-left: 8px;' : ''}">
                         <div class="actor-info">
                             <div class="actor-name">${actor.role}</div>
                             <div style="font-size: 0.85rem; color: var(--text-secondary);">${location}</div>
                             ${warningMsg}
                         </div>
-                        <div class="actor-time ${timeColor}">
+                        <div class="actor-time ${timeColor}" style="${actor.noTimezone ? 'color: #ef4444; font-weight: bold;' : ''}">
                             ${actor.formattedTime} <span style="font-size:0.8rem">${actor.dayShift}</span>
                         </div>
                     </div>
                 `;
             });
 
-            if (!isWarning) {
+            if (hasInvalid) {
+                html += `<div style="margin-top: 20px; text-align: center;">
+                    <button class="btn" disabled style="background:#374151; color:#9ca3af; cursor: not-allowed; width: 100%;">
+                        No es posible agendar (Falta vincular Zona IANA)
+                    </button>
+                </div>`;
+            } else if (!isWarning) {
                 html += `<div style="margin-top: 20px; text-align: center;"><button class="btn btn-primary" style="width: 100%;">Proceder a Agendar en Calendly</button></div>`;
             } else {
                 html += `<div style="margin-top: 20px; text-align: center;"><button class="btn" style="background:#f59e0b; color:#000; width: 100%;">Forzar Agendamiento de Todos Modos</button></div>`;
@@ -141,6 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultArea.innerHTML = html;
 
+        } else if (result.status === "NO_ORIGIN_TIMEZONE") {
+            resultArea.className = 'triangulation-result status-indicator error';
+            resultArea.innerHTML = `<h3 style="margin-top:0; color: var(--error-color);">❌ Origen Sin Zona Horaria</h3>
+            <p>${result.message}</p>
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn" disabled style="background:#374151; color:#9ca3af; cursor: not-allowed; width: 100%;">
+                    No es posible agendar (Origen sin Zona)
+                </button>
+            </div>`;
         } else if (result.status === "MISSING_DATA") {
             resultArea.className = 'triangulation-result status-indicator error';
             resultArea.innerHTML = `<h3 style="margin-top:0; color: var(--error-color);">❌ Faltan Datos de Región</h3>

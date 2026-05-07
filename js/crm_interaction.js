@@ -1,7 +1,7 @@
-import { geoDatabase } from '../data/mockDB.js';
+import { PaisesService } from './services/paisesService.js';
 import { TimeOrchestrator } from './agents/TimeOrchestrator.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const today = new Date();
     document.getElementById('fecha-base').value = today.toISOString().split('T')[0];
 
@@ -18,7 +18,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const selPartner = document.getElementById('sel-partner');
     const selCliente = document.getElementById('sel-cliente');
 
-    const paises = Object.keys(geoDatabase);
+    // Cargar la base de datos geográfica de países desde Supabase de forma asíncrona
+    let activeGeoDatabase = {};
+    try {
+        activeGeoDatabase = await PaisesService.getGeoDatabase();
+    } catch (e) {
+        console.error("Error al obtener la base de datos de países de Supabase:", e);
+    }
+
+    const paises = Object.keys(activeGeoDatabase).sort();
 
     function poblarSelect(selectElement, opciones, seleccionado = null) {
         selectElement.innerHTML = '';
@@ -38,7 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = document.getElementById(cardId);
         let regionSel = card.querySelector('.sel-region');
         
-        if (geoDatabase[pais] && geoDatabase[pais].requiresRegion) {
+        const data = activeGeoDatabase[pais];
+        if (data && data.requiresRegion) {
             if (!regionSel) {
                 regionSel = document.createElement('select');
                 regionSel.className = 'glass-input sel-region';
@@ -47,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.appendChild(regionSel);
                 regionSel.addEventListener('change', actualizarTriangulacion);
             }
-            const regiones = Object.keys(geoDatabase[pais].regions);
+            const regiones = data.regions ? Object.keys(data.regions) : [];
             poblarSelect(regionSel, regiones, regiones[0]);
         } else {
             if (regionSel) {
@@ -106,18 +115,43 @@ document.addEventListener('DOMContentLoaded', () => {
             getActorData('cliente', 'Cliente')
         ];
 
-        const resultado = TimeOrchestrator.triangulate(fecha, timeString, actors);
+        const resultado = TimeOrchestrator.triangulate(fecha, timeString, actors, activeGeoDatabase);
 
         if (resultado.status === "SUCCESS") {
             const warnBox = document.getElementById('warning-box');
             const btnAgendar = document.getElementById('btn-agendar');
 
-            if (resultado.hasWarnings) {
+            if (resultado.hasInvalidZones) {
                 warnBox.style.display = 'block';
+                warnBox.innerHTML = `<strong>❌ Error de Configuración:</strong> Uno o más participantes no tienen zona horaria vinculada en la base de datos.`;
+                warnBox.style.background = 'rgba(239, 68, 68, 0.2)';
+                warnBox.style.borderColor = '#ef4444';
+                warnBox.style.color = '#fecaca';
+                
+                btnAgendar.disabled = true;
+                btnAgendar.style.background = '#4b5563';
+                btnAgendar.style.color = '#9ca3af';
+                btnAgendar.style.cursor = 'not-allowed';
+                btnAgendar.textContent = "No es posible agendar (Falta Zona IANA)";
+            } else if (resultado.hasWarnings) {
+                warnBox.style.display = 'block';
+                warnBox.innerHTML = `<strong>⚠️ Advertencia de Horario Comercial:</strong> El horario proyectado para Argentina (<span id="warn-arg-time"></span>) está fuera del horario laboral (09:00 - 20:00).`;
+                warnBox.style.background = 'rgba(245, 158, 11, 0.2)';
+                warnBox.style.borderColor = '#f59e0b';
+                warnBox.style.color = '#fef3c7';
+                
+                btnAgendar.disabled = false;
+                btnAgendar.style.background = '';
+                btnAgendar.style.color = '';
+                btnAgendar.style.cursor = '';
                 btnAgendar.classList.add('btn-force');
                 btnAgendar.textContent = "Forzar Agendamiento (Fuera de Horario)";
             } else {
                 warnBox.style.display = 'none';
+                btnAgendar.disabled = false;
+                btnAgendar.style.background = '';
+                btnAgendar.style.color = '';
+                btnAgendar.style.cursor = '';
                 btnAgendar.classList.remove('btn-force');
                 btnAgendar.textContent = "Continuar al Agendamiento";
             }
@@ -125,16 +159,36 @@ document.addEventListener('DOMContentLoaded', () => {
             resultado.results.forEach(res => {
                 document.getElementById(`time-${res.id}`).textContent = res.formattedTime;
                 
-                // dayShift viene como string desde utcConversionBridge ("+1 día", "-1 día", "")
                 let dayStr = "Mismo Día";
                 if (res.dayShift && res.dayShift.includes('+1')) dayStr = "+1 Día";
-                if (res.dayShift && res.dayShift.includes('-1')) dayStr = "-1 Día";
+                else if (res.dayShift && res.dayShift.includes('-1')) dayStr = "-1 Día";
+                else if (res.dayShift === "Sin Zona") dayStr = "Sin Zona";
                 
                 document.getElementById(`date-${res.id}`).textContent = dayStr;
 
                 if (res.id === 'central' && res.warning) {
                     document.getElementById('warn-arg-time').textContent = res.formattedTime;
                 }
+            });
+        } else if (resultado.status === "NO_ORIGIN_TIMEZONE") {
+            const warnBox = document.getElementById('warning-box');
+            const btnAgendar = document.getElementById('btn-agendar');
+            
+            warnBox.style.display = 'block';
+            warnBox.innerHTML = `<strong>❌ Error de Origen:</strong> El partner (origen) no tiene una zona horaria configurada.`;
+            warnBox.style.background = 'rgba(239, 68, 68, 0.2)';
+            warnBox.style.borderColor = '#ef4444';
+            warnBox.style.color = '#fecaca';
+            
+            btnAgendar.disabled = true;
+            btnAgendar.style.background = '#4b5563';
+            btnAgendar.style.color = '#9ca3af';
+            btnAgendar.style.cursor = 'not-allowed';
+            btnAgendar.textContent = "No es posible agendar (Origen sin Zona)";
+            
+            actors.forEach(actor => {
+                document.getElementById(`time-${actor.id}`).textContent = "--:--";
+                document.getElementById(`date-${actor.id}`).textContent = "Sin Zona";
             });
         } else {
             console.error("Error en triangulación:", resultado);
